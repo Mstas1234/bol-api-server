@@ -35,12 +35,12 @@ async function getToken() {
 app.get('/orders', async (req, res) => {
   try {
     const token = await getToken();
-
     let allOrders = [];
-    let url = 'https://api.bol.com/retailer/orders?status=ALL';
+    let page = 1;
+    let hasMore = true;
 
-    while (url) {
-      const response = await fetch(url, {
+    while (hasMore) {
+      const response = await fetch(`https://api.bol.com/retailer/orders?status=ALL&page=${page}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -50,28 +50,26 @@ app.get('/orders', async (req, res) => {
 
       const data = await response.json();
 
-      if (!data.orders || !Array.isArray(data.orders)) break;
+      if (!data.orders || data.orders.length === 0) {
+        hasMore = false;
+        break;
+      }
 
       const simplified = data.orders.map(order => ({
-        reference: order.reference,
         orderDate: order.orderPlacedDateTime,
-        orderItemId: order.orderItems?.[0]?.orderItemId || '❌',
-        ean: order.orderItems?.[0]?.ean || '❌',
-        quantity: order.orderItems?.[0]?.quantity || 0,
-        address: order.customerDetails?.shipmentDetails?.address,
-        email: order.customerDetails?.email
+        orderItemId: order.orderItems[0]?.orderItemId,
+        ean: order.orderItems[0]?.ean,
+        quantity: order.orderItems[0]?.quantity
       }));
 
-      allOrders = [...allOrders, ...simplified];
-
-      const nextLink = data._links?.next?.href;
-      url = nextLink ? 'https://api.bol.com' + nextLink : null;
+      allOrders = allOrders.concat(simplified);
+      page++;
     }
 
     res.json(allOrders);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to fetch orders with pagination' });
+    res.status(500).json({ error: 'Failed to fetch all orders' });
   }
 });
 
