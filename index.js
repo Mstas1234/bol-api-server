@@ -32,41 +32,49 @@ async function getToken() {
   return cachedToken;
 }
 
-// 📦 Получение списка заказов (все заказы)
 app.get('/orders', async (req, res) => {
   try {
     const token = await getToken();
 
-    const response = await fetch('https://api.bol.com/retailer/orders?status=ALL', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/vnd.retailer.v9+json'
-      }
-    });
+    let allOrders = [];
+    let url = 'https://api.bol.com/retailer/orders?status=ALL';
 
-    const data = await response.json();
+    while (url) {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.retailer.v9+json'
+        }
+      });
 
-    if (!data.orders || !Array.isArray(data.orders) || data.orders.length === 0) {
-      return res.status(200).json({ error: 'No orders found or wrong response' });
+      const data = await response.json();
+
+      if (!data.orders || !Array.isArray(data.orders)) break;
+
+      const simplified = data.orders.map(order => ({
+        reference: order.reference,
+        orderDate: order.orderPlacedDateTime,
+        orderItemId: order.orderItems?.[0]?.orderItemId || '❌',
+        ean: order.orderItems?.[0]?.ean || '❌',
+        quantity: order.orderItems?.[0]?.quantity || 0,
+        address: order.customerDetails?.shipmentDetails?.address,
+        email: order.customerDetails?.email
+      }));
+
+      allOrders = [...allOrders, ...simplified];
+
+      const nextLink = data._links?.next?.href;
+      url = nextLink ? 'https://api.bol.com' + nextLink : null;
     }
 
-    const simplified = data.orders.map(order => ({
-      reference: order.reference,
-      orderDate: order.orderPlacedDateTime,
-      orderItemId: order.orderItems?.[0]?.orderItemId || '❌',
-      ean: order.orderItems?.[0]?.ean || '❌',
-      quantity: order.orderItems?.[0]?.quantity || 0,
-      address: order.customerDetails?.shipmentDetails?.address,
-      email: order.customerDetails?.email
-    }));
-
-    res.json(simplified);
+    res.json(allOrders);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to fetch orders' });
+    res.status(500).json({ error: 'Failed to fetch orders with pagination' });
   }
 });
+
 
 // 📮 Подтверждение доставки
 app.post('/confirm-delivery', async (req, res) => {
