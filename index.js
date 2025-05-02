@@ -60,5 +60,35 @@ app.post('/confirm-delivery', async (req, res) => {
     res.status(500).send('Server error: ' + e.message);
   }
 });
+app.get('/order-id', async (req, res) => {
+  const reference = req.query.reference;
+  if (!reference) return res.status(400).json({ error: 'Missing ?reference=' });
+
+  try {
+    const token = await getToken();
+
+    const response = await fetch(`https://api.bol.com/retailer/orders?status=ALL`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.retailer.v9+json'
+      }
+    });
+
+    const data = await response.json();
+    const orderItem = data.orders?.find(order => order.customerDetails?.shipmentDetails?.reference === reference);
+
+    if (!orderItem) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const orderItemId = orderItem.orderItems?.[0]?.orderItemId;
+
+    res.json({ orderItemId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch order ID' });
+  }
+});
 
 app.listen(3000, () => console.log('Server running'));
