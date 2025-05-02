@@ -90,5 +90,36 @@ app.get('/order-id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch order ID' });
   }
 });
+app.get('/orders', async (req, res) => {
+  try {
+    const token = await getToken(); // 🔑 Берём ключ доступа
+
+    const response = await fetch('https://api.bol.com/retailer/orders?status=OPEN', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`, // 🪪 Ключ отправляем
+        'Accept': 'application/vnd.retailer.v9+json'
+      }
+    });
+
+    const data = await response.json(); // 📥 Ответ от Bol
+
+    // 🎁 Собираем только нужную информацию
+    const simplified = data.orders.map(order => ({
+      reference: order.reference,
+      orderDate: order.orderPlacedDateTime,
+      orderItemId: order.orderItems[0]?.orderItemId,
+      ean: order.orderItems[0]?.ean,
+      quantity: order.orderItems[0]?.quantity,
+      address: order.customerDetails?.shipmentDetails?.address,
+      email: order.customerDetails?.email
+    }));
+
+    res.json(simplified); // ⬅️ Отдаём тебе список заказов
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
 
 app.listen(3000, () => console.log('Server running'));
