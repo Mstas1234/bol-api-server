@@ -9,7 +9,7 @@ const CLIENT_SECRET = process.env.BOL_CLIENT_SECRET;
 let cachedToken = null;
 let tokenExpires = 0;
 
-// Получение токена авторизации
+// 🔐 Получение токена авторизации
 async function getToken() {
   const now = Date.now();
 
@@ -26,13 +26,13 @@ async function getToken() {
 
   const data = await res.json();
   if (!data.access_token) throw new Error('Не удалось получить токен. Проверь CLIENT_ID и CLIENT_SECRET.');
-  
+
   cachedToken = data.access_token;
   tokenExpires = now + (data.expires_in * 1000 - 5000);
   return cachedToken;
 }
 
-// 📦 Получение списка заказов (все заказы)
+// 📦 Получение всех заказов
 app.get('/orders', async (req, res) => {
   try {
     const token = await getToken();
@@ -47,8 +47,8 @@ app.get('/orders', async (req, res) => {
 
     const data = await response.json();
 
-    if (!data.orders || !Array.isArray(data.orders) || data.orders.length === 0) {
-      return res.status(200).json({ error: 'No orders found or wrong response' });
+    if (!data.orders || !Array.isArray(data.orders)) {
+      return res.status(200).json({ error: 'No orders found' });
     }
 
     const simplified = data.orders.map(order => ({
@@ -97,11 +97,12 @@ app.post('/confirm-delivery', async (req, res) => {
     const result = await response.json();
     res.json({ status: '✅ Delivered', bol: result });
   } catch (e) {
+    console.error(e);
     res.status(500).send('Server error: ' + e.message);
   }
 });
 
-// 🔍 Получение ID по номеру заказа
+// 🔍 Получение orderItemId по reference
 app.get('/order-id', async (req, res) => {
   const reference = req.query.reference;
   if (!reference) return res.status(400).json({ error: 'Missing ?reference=' });
@@ -125,11 +126,43 @@ app.get('/order-id', async (req, res) => {
     }
 
     const orderItemId = orderItem.orderItems?.[0]?.orderItemId;
-
     res.json({ orderItemId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch order ID' });
+  }
+});
+
+// 🚚 Получить список отправленных товаров
+app.get('/shipments', async (req, res) => {
+  try {
+    const token = await getToken();
+
+    const response = await fetch('https://api.bol.com/retailer/shipments', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.retailer.v9+json'
+      }
+    });
+
+    const data = await response.json();
+
+    if (!data.shipments || !Array.isArray(data.shipments)) {
+      return res.status(200).json({ error: 'No shipments found' });
+    }
+
+    const simplified = data.shipments.map(shipment => ({
+      shipmentId: shipment.shipmentId,
+      orderItemId: shipment.orderItems?.[0]?.orderItemId || '❌',
+      transport: shipment.transport,
+      shipmentDateTime: shipment.shipmentDateTime
+    }));
+
+    res.json(simplified);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch shipments' });
   }
 });
 
