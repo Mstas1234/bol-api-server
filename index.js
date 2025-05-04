@@ -139,5 +139,52 @@ app.post('/confirm-delivery', async (req, res) => {
     res.status(500).send('Server error: ' + e.message);
   }
 });
+// ✅ Получить все доставленные заказы
+app.get('/delivered', async (req, res) => {
+  try {
+    const token = await getToken();
+    let allDelivered = [];
+    let page = 1;
+    let totalPages = 1;
+
+    do {
+      const response = await fetch(`https://api.bol.com/retailer/orders?status=SHIPPED&page=${page}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.retailer.v9+json'
+        }
+      });
+
+      const data = await response.json();
+      if (!data.orders || !Array.isArray(data.orders)) break;
+
+      const simplified = data.orders.map(order => ({
+        orderDate: order.orderPlacedDateTime,
+        orderItemId: order.orderItems[0]?.orderItemId,
+        ean: order.orderItems[0]?.ean,
+        quantity: order.orderItems[0]?.quantity,
+        reference: order.customerDetails?.shipmentDetails?.reference,
+        address: order.customerDetails?.shipmentDetails?.address,
+        email: order.customerDetails?.email
+      }));
+
+      allDelivered.push(...simplified);
+
+      if (page === 1 && data.pagination) {
+        const totalItems = data.pagination.total;
+        const pageSize = data.pagination.itemsPerPage;
+        totalPages = Math.ceil(totalItems / pageSize);
+      }
+
+      page++;
+    } while (page <= totalPages);
+
+    res.json(allDelivered);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch delivered orders' });
+  }
+});
 
 app.listen(3000, () => console.log('🚀 Server running on port 3000'));
