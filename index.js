@@ -70,12 +70,12 @@ app.get('/orders', async (req, res) => {
 
 // 📮 Подтверждение доставки
 app.post('/confirm-delivery', async (req, res) => {
-  const { orderId, transporterCode = 'TNT', trackAndTrace = '1234567890' } = req.body;
+  const { orderItemId, transporterCode = 'TNT', trackAndTrace = '1234567890' } = req.body;
 
   try {
     const token = await getToken();
 
-    const response = await fetch(`https://api.bol.com/retailer/orders/${orderId}/shipment`, {
+    const response = await fetch(`https://api.bol.com/retailer/orders/${orderItemId}/shipment`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -83,7 +83,7 @@ app.post('/confirm-delivery', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        shipmentReference: `DELIVERY-${orderId}`,
+        shipmentReference: `DELIVERY-${orderItemId}`,
         transport: { transporterCode, trackAndTrace },
         shippingLabelId: null
       })
