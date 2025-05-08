@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Track your order</title>
+  <style>
+    #map { height: 400px; margin-bottom: 10px; }
+    #delivery-address { display: none; font-size: 18px; margin-top: 10px; }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+<body>
+  <h2>Track your order</h2>
+  <p>Order: <span id="order-id"></span></p>
+  <p>Status: In delivery</p>
+  <div id="map"></div>
+  <div id="delivery-address">Delivery address: <span id="address-text"></span></div>
+  <button onclick="confirmDelivery()">✅ Confirm delivery</button>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('orderId');
+    const deliveryAddress = urlParams.get('address');
+    const lat = 51.12190; // Пока просто пример
+    const lng = 4.20146;
+
+    document.getElementById('order-id').innerText = orderId;
+
+    const map = L.map('map').setView([lat, lng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    L.marker([lat, lng]).addTo(map).bindPopup('Current location').openPopup();
+
+    function confirmDelivery() {
+      document.getElementById('map').style.display = 'none';
+      document.getElementById('delivery-address').style.display = 'block';
+      document.getElementById('address-text').innerText = deliveryAddress;
+    }
+  </script>
+</body>
+</html>
